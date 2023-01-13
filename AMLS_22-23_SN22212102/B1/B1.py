@@ -11,22 +11,28 @@ from torchvision import models
 from PIL import Image
 from matplotlib import pyplot as plt
 
+# Recommended normalization params
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
+
+# hyper parameters
+lr = 0.01
+epoch = 5
+batch_size = 16
 
 Loss_list = []
 Accuracy_train_list = []
 Accuracy_test_list = []
 
-train_datapath = pathlib.Path.cwd().parents[0]/'Datasets'/'dataset_AMLS_22-23'/'cartoon_set'
-test_datapath = pathlib.Path.cwd().parents[0]/'Datasets'/'dataset_AMLS_22-23_test'/'cartoon_set_test'
+train_datapath = pathlib.Path.cwd()/'Datasets'/'dataset_AMLS_22-23'/'cartoon_set'
+test_datapath = pathlib.Path.cwd()/'Datasets'/'dataset_AMLS_22-23_test'/'cartoon_set_test'
 task='face'
 model_save_path = pathlib.Path.cwd()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = torch.device('cpu')
 
-log_path = pathlib.Path.cwd() / ("train_test_" + str(time.strftime("%m_%d_%H_%M_%S", time.localtime())) + ".log")
+log_path = pathlib.Path.cwd() / (task + "_train_test_" + str(time.strftime("%m_%d_%H_%M_%S", time.localtime())) + ".log")
 logging.basicConfig(format='%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s',
                     level=logging.INFO,
                     filename=log_path,
@@ -99,19 +105,13 @@ class amls_dataset(Dataset):
     def __len__(self):
         return len(self.all_image_paths)
 
-train_dataset = amls_dataset(train_datapath, task, "training")
-test_dataset = amls_dataset(test_datapath, task, "test")
-
-batch_size = 16
-train_iter = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_iter = DataLoader(test_dataset, batch_size=batch_size)
-
 def train(net, train_iter, test_iter, criterion, optimizer, num_epochs):
     net = net.to(device)
     logging.info("-----training on %s-----", str(device))
     print("-----training on ", str(device), "-----")
     print(net)
     whole_batch_count = 0
+    # training loop
     for epoch in range(num_epochs):
         start = time.time()
         net.train()  # trainning mode
@@ -140,6 +140,7 @@ def train(net, train_iter, test_iter, criterion, optimizer, num_epochs):
             print('-epoch %d, batch_count %d, img nums %d, loss temp %.4f, train acc temp %.3f, time %.1f sec'
                   % (epoch + 1, whole_batch_count, n, loss.item(), temp_acc_train, time.time() - start))
 
+        # test dataset inference will be done after each epoch
         with torch.no_grad():
             net.eval()  # evaluate mode
             test_acc_sum, n2 = 0.0, 0
@@ -162,12 +163,14 @@ def train(net, train_iter, test_iter, criterion, optimizer, num_epochs):
         create_csv(result_path, test_result_list)
 
 def create_csv(path, result_list):
+    # save predict labels of test dataset
     with open(path, 'w', newline='') as f:
         csv_write = csv.writer(f)
         csv_write.writerow(["predict_label", "gt_label", "match"])
         csv_write.writerows(result_list)
 
 def plot_save(loss_list, acc_list):
+    # plot temporary loss of training and accuracy of test dataset after each epoch training
     x1 = range(len(acc_list))
     x2 = range(len(loss_list))
     y1 = acc_list
@@ -183,22 +186,31 @@ def plot_save(loss_list, acc_list):
     # plt.show()
     plt.savefig((task + "_epoch_" + str(epoch) + "_lr_" + str(lr) + "_" + str(time.strftime("%m_%d_%H_%M_%S", time.localtime())) +".jpg"))
 
-pretrained_net = models.resnet18(pretrained=True)
-num_ftrs = pretrained_net.fc.in_features
-pretrained_net.fc = nn.Linear(num_ftrs, 5)
+def run():
+    # main function described in report
+    train_dataset = amls_dataset(train_datapath, task, "training")
+    test_dataset = amls_dataset(test_datapath, task, "test")
 
-output_params = list(map(id, pretrained_net.fc.parameters()))
-feature_params = filter(lambda p: id(p) not in output_params, pretrained_net.parameters())
-lr = 0.001
-epoch = 5
-optimizer = optim.SGD([{'params': feature_params},
-                       {'params': pretrained_net.fc.parameters(), 'lr': lr * 10}],
-                      lr=lr, weight_decay=0.001)
+    train_iter = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_iter = DataLoader(test_dataset, batch_size=batch_size)
 
-loss = torch.nn.CrossEntropyLoss()
-train(pretrained_net, train_iter, test_iter, loss, optimizer, num_epochs=epoch)
+    pretrained_net = models.resnet18(pretrained=True)
+    num_ftrs = pretrained_net.fc.in_features
+    pretrained_net.fc = nn.Linear(num_ftrs, 5)
 
-plot_save(Loss_list, Accuracy_test_list)
+    output_params = list(map(id, pretrained_net.fc.parameters()))
+    feature_params = filter(lambda p: id(p) not in output_params, pretrained_net.parameters())
+    optimizer = optim.SGD([{'params': feature_params},
+                           {'params': pretrained_net.fc.parameters(), 'lr': lr * 10}],
+                          lr=lr, weight_decay=0.001)
 
-torch.save(pretrained_net.state_dict(),
-           model_save_path / (task + "_epoch_" + str(epoch) + "_lr_" + str(lr) + "_" + str(time.strftime("%m_%d_%H_%M_%S", time.localtime())) +".pth"))
+    loss = torch.nn.CrossEntropyLoss()
+    train(pretrained_net, train_iter, test_iter, loss, optimizer, num_epochs=epoch)
+
+    plot_save(Loss_list, Accuracy_test_list)
+
+    torch.save(pretrained_net.state_dict(),
+               model_save_path / (task + "_epoch_" + str(epoch) + "_lr_" + str(lr) + "_" + str(time.strftime("%m_%d_%H_%M_%S", time.localtime())) +".pth"))
+
+if __name__ == '__main__':
+    run()
