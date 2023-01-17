@@ -193,6 +193,9 @@ def plot_save(loss_list, acc_list):
     plt.ylabel('Train loss')
     # plt.show()
     plt.savefig((task + "_epoch_" + str(epoch) + "_lr_" + str(lr) + "_" + str(time.strftime("%m_%d_%H_%M_%S", time.localtime())) +"_cropped_padded.jpg"))
+    plt.clf()  # Clear figure
+    plt.cla()  # Clear axes
+    plt.close()
 
 def pad_image(image, target_size):
     # pad image to target_size, the padding edge will only be used on the necessary dimension

@@ -185,6 +185,9 @@ def plot_save(loss_list, acc_list):
     plt.ylabel('Test loss')
     # plt.show()
     plt.savefig((task + "_epoch_" + str(epoch) + "_lr_" + str(lr) + "_" + str(time.strftime("%m_%d_%H_%M_%S", time.localtime())) +".jpg"))
+    plt.clf()  # Clear figure
+    plt.cla()  # Clear axes
+    plt.close()
 
 def run():
     # main function described in report
@@ -194,7 +197,7 @@ def run():
     train_iter = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_iter = DataLoader(test_dataset, batch_size=batch_size)
 
-    pretrained_net = models.resnet18(pretrained=False)
+    pretrained_net = models.resnet18(pretrained=True)
     num_ftrs = pretrained_net.fc.in_features
     pretrained_net.fc = nn.Linear(num_ftrs, 2)
 

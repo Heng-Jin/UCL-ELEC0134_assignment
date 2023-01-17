@@ -185,6 +185,9 @@ def plot_save(loss_list, acc_list):
     plt.ylabel('Test loss')
     # plt.show()
     plt.savefig((task + "_epoch_" + str(epoch) + "_lr_" + str(lr) + "_" + str(time.strftime("%m_%d_%H_%M_%S", time.localtime())) +".jpg"))
+    plt.clf()  # Clear figure
+    plt.cla()  # Clear axes
+    plt.close()
 
 def run():
     # main function described in report
